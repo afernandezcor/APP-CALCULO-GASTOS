@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Expense, ExpenseStatus } from '../types';
 import { MOCK_EXPENSES } from '../mockData';
@@ -7,6 +8,8 @@ interface ExpenseContextType {
   addExpense: (expense: Expense) => void;
   updateStatus: (id: string, status: ExpenseStatus, notes?: string) => void;
   getExpensesByUser: (userId: string) => Expense[];
+  deleteExpense: (id: string) => void;
+  editExpense: (id: string, updatedExpense: Partial<Expense>) => void;
 }
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
@@ -28,7 +31,12 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Save to LocalStorage whenever expenses change
   useEffect(() => {
-    localStorage.setItem('track_expense_data', JSON.stringify(expenses));
+    try {
+        localStorage.setItem('track_expense_data', JSON.stringify(expenses));
+    } catch (error) {
+        console.error("Failed to save expenses to LocalStorage. Storage might be full.", error);
+        // Note: In a production app, we would likely trigger a global toast notification here
+    }
   }, [expenses]);
 
   const addExpense = (expense: Expense) => {
@@ -44,12 +52,25 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   };
 
+  const deleteExpense = (id: string) => {
+    setExpenses(prev => prev.filter(exp => exp.id !== id));
+  };
+
+  const editExpense = (id: string, updatedExpense: Partial<Expense>) => {
+    setExpenses(prev => prev.map(exp => {
+      if (exp.id === id) {
+        return { ...exp, ...updatedExpense };
+      }
+      return exp;
+    }));
+  };
+
   const getExpensesByUser = (userId: string) => {
     return expenses.filter(e => e.userId === userId);
   };
 
   return (
-    <ExpenseContext.Provider value={{ expenses, addExpense, updateStatus, getExpensesByUser }}>
+    <ExpenseContext.Provider value={{ expenses, addExpense, updateStatus, getExpensesByUser, deleteExpense, editExpense }}>
       {children}
     </ExpenseContext.Provider>
   );

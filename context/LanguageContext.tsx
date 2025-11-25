@@ -78,6 +78,13 @@ const translations: Record<Language, Record<string, string>> = {
     'add.notes': 'Notes (Optional)',
     'add.submit': 'Submit Expense',
     
+    // Actions
+    'action.edit': 'Edit Expense',
+    'action.delete': 'Delete',
+    'action.save': 'Save Changes',
+    'action.cancel': 'Cancel',
+    'action.deleteConfirm': 'Are you sure you want to delete this expense? This action cannot be undone.',
+    
     // Report
     'report.title': 'Expense Report Builder',
     'report.export': 'Export to Excel',
@@ -201,6 +208,13 @@ const translations: Record<Language, Record<string, string>> = {
     'add.notes': 'Notas (Opcional)',
     'add.submit': 'Enviar Gasto',
 
+    // Actions
+    'action.edit': 'Editar Gasto',
+    'action.delete': 'Eliminar',
+    'action.save': 'Guardar Cambios',
+    'action.cancel': 'Cancelar',
+    'action.deleteConfirm': '¿Estás seguro de que quieres eliminar este gasto? Esta acción no se puede deshacer.',
+
     // Report
     'report.title': 'Generador de Informes',
     'report.export': 'Exportar a Excel',
@@ -323,6 +337,13 @@ const translations: Record<Language, Record<string, string>> = {
     'add.total': 'Total',
     'add.notes': 'Notes (Optionnel)',
     'add.submit': 'Soumettre',
+
+    // Actions
+    'action.edit': 'Modifier',
+    'action.delete': 'Supprimer',
+    'action.save': 'Enregistrer',
+    'action.cancel': 'Annuler',
+    'action.deleteConfirm': 'Êtes-vous sûr de vouloir supprimer cette dépense ? Cette action est irréversible.',
 
     // Report
     'report.title': 'Générateur de rapports',

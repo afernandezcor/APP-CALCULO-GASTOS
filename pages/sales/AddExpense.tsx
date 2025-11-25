@@ -8,8 +8,37 @@ import { ExpenseStatus, ExpenseCategory } from '../../types';
 import { Button } from '../../components/Button';
 import { Camera, Upload, ArrowLeft, Save, Wand2 } from 'lucide-react';
 
-// Since I cannot install external libs like uuid, I'll create a simple one.
+// Simple UUID generator
 const simpleId = () => Math.random().toString(36).substring(2, 15);
+
+// Image Compression Utility
+const compressImage = (base64Str: string, maxWidth = 1024, quality = 0.7): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+      } else {
+          resolve(base64Str); // Fallback
+      }
+    };
+    img.onerror = () => resolve(base64Str); // Fallback
+  });
+};
 
 export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
   const { user } = useAuth();
@@ -18,6 +47,7 @@ export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ nav
   
   const [step, setStep] = useState<'upload' | 'analyzing' | 'edit'>('upload');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [formData, setFormData] = useState({
     merchant: '',
     date: new Date().toISOString().split('T')[0],
@@ -34,14 +64,20 @@ export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ nav
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsCompressing(true);
+
     const reader = new FileReader();
     reader.onloadend = async () => {
-      const base64String = reader.result as string;
-      setImagePreview(base64String);
+      const originalBase64 = reader.result as string;
+      
+      // Compress the image immediately
+      const compressedBase64 = await compressImage(originalBase64);
+      setImagePreview(compressedBase64);
+      setIsCompressing(false);
       setStep('analyzing');
       
-      // Call Gemini API
-      const result = await analyzeReceiptImage(base64String);
+      // Call Gemini API with the COMPRESSED image (faster and cheaper)
+      const result = await analyzeReceiptImage(compressedBase64);
       
       setFormData({
         merchant: result.merchant,
@@ -58,27 +94,32 @@ export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ nav
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    addExpense({
-      id: simpleId(),
-      userId: user.id,
-      userName: user.name,
-      merchant: formData.merchant,
-      date: formData.date,
-      subtotal: formData.subtotal,
-      tax: formData.tax,
-      total: formData.total,
-      category: formData.category,
-      imageUrl: imagePreview || '',
-      status: ExpenseStatus.SUBMITTED,
-      notes: formData.notes,
-      createdAt: new Date().toISOString()
-    });
+    try {
+        addExpense({
+        id: simpleId(),
+        userId: user.id,
+        userName: user.name,
+        merchant: formData.merchant,
+        date: formData.date,
+        subtotal: formData.subtotal,
+        tax: formData.tax,
+        total: formData.total,
+        category: formData.category,
+        imageUrl: imagePreview || '',
+        status: ExpenseStatus.SUBMITTED,
+        notes: formData.notes,
+        createdAt: new Date().toISOString()
+        });
 
-    navigate('/my-expenses');
+        navigate('/my-expenses');
+    } catch (error) {
+        alert("Error saving expense. Storage might be full.");
+        console.error(error);
+    }
   };
 
   return (
@@ -106,7 +147,12 @@ export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ nav
               ref={fileInputRef}
               onChange={handleFileChange}
             />
-             <Button onClick={() => fileInputRef.current?.click()} size="lg" className="w-full">
+             <Button 
+                onClick={() => fileInputRef.current?.click()} 
+                size="lg" 
+                className="w-full"
+                isLoading={isCompressing}
+            >
               <Upload className="h-4 w-4 mr-2" />
               {t('add.upload')}
             </Button>

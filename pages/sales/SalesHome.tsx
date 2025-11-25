@@ -1,21 +1,25 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useExpenses } from '../../context/ExpenseContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { Expense, ExpenseStatus } from '../../types';
-import { Plus, Search, Calendar, CheckCircle, FileText, XCircle, Euro, Filter } from 'lucide-react';
+import { Expense, ExpenseStatus, ExpenseCategory } from '../../types';
+import { Plus, Search, Calendar, CheckCircle, FileText, XCircle, Euro, Filter, Trash2, Edit2, Save, X } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
   const { user } = useAuth();
-  const { getExpensesByUser } = useExpenses();
+  const { getExpensesByUser, deleteExpense, editExpense } = useExpenses();
   const { t, formatCurrency, language } = useLanguage();
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [statusFilter, setStatusFilter] = useState<ExpenseStatus | 'ALL'>('ALL');
   
+  // Edit Mode State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Expense>>({});
+
   // Date Filters
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth()); // 0-11, or -1 for All
@@ -75,6 +79,34 @@ export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navi
       default: return 'bg-yellow-100 text-yellow-800';
     }
   };
+
+  const handleEditClick = () => {
+      if (selectedExpense) {
+          setEditForm(selectedExpense);
+          setIsEditing(true);
+      }
+  };
+
+  const handleSaveClick = () => {
+      if (selectedExpense && editForm) {
+          editExpense(selectedExpense.id, editForm);
+          setSelectedExpense({ ...selectedExpense, ...editForm } as Expense);
+          setIsEditing(false);
+      }
+  };
+
+  const handleDeleteClick = () => {
+      if (selectedExpense && window.confirm(t('action.deleteConfirm'))) {
+          deleteExpense(selectedExpense.id);
+          setSelectedExpense(null);
+          setIsEditing(false);
+      }
+  };
+
+  // Reset edit state when modal closes or expense changes
+  useEffect(() => {
+      if (!selectedExpense) setIsEditing(false);
+  }, [selectedExpense]);
 
   return (
     <div className="space-y-8 pb-24">
@@ -257,7 +289,7 @@ export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navi
       <Modal 
         isOpen={!!selectedExpense} 
         onClose={() => setSelectedExpense(null)}
-        title="Expense Details"
+        title={isEditing ? t('action.edit') : "Expense Details"}
       >
         {selectedExpense && (
           <div className="space-y-6">
@@ -268,46 +300,132 @@ export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navi
                 className="w-full h-full object-contain"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <label className="block text-gray-500 text-xs uppercase font-medium">{t('dash.merchant')}</label>
-                <p className="text-gray-900 font-medium mt-1">{selectedExpense.merchant}</p>
-              </div>
-              <div>
-                <label className="block text-gray-500 text-xs uppercase font-medium">{t('add.date')}</label>
-                <p className="text-gray-900 font-medium mt-1">{selectedExpense.date}</p>
-              </div>
-              <div>
-                <label className="block text-gray-500 text-xs uppercase font-medium">{t('add.category')}</label>
-                <p className="text-gray-900 font-medium mt-1">{t(`cat.${selectedExpense.category}`) || selectedExpense.category}</p>
-              </div>
-              <div>
-                <label className="block text-gray-500 text-xs uppercase font-medium">{t('dash.status')}</label>
-                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mt-1 ${getStatusColor(selectedExpense.status)}`}>
-                    {selectedExpense.status}
-                </span>
-              </div>
-              <div className="col-span-2 border-t pt-4 mt-2">
-                <div className="flex justify-between py-1">
-                  <span className="text-gray-600">{t('add.subtotal')}</span>
-                  <span>{formatCurrency(selectedExpense.subtotal)}</span>
+            
+            {/* View Mode */}
+            {!isEditing ? (
+                <>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <label className="block text-gray-500 text-xs uppercase font-medium">{t('dash.merchant')}</label>
+                        <p className="text-gray-900 font-medium mt-1">{selectedExpense.merchant}</p>
+                    </div>
+                    <div>
+                        <label className="block text-gray-500 text-xs uppercase font-medium">{t('add.date')}</label>
+                        <p className="text-gray-900 font-medium mt-1">{selectedExpense.date}</p>
+                    </div>
+                    <div>
+                        <label className="block text-gray-500 text-xs uppercase font-medium">{t('add.category')}</label>
+                        <p className="text-gray-900 font-medium mt-1">{t(`cat.${selectedExpense.category}`) || selectedExpense.category}</p>
+                    </div>
+                    <div>
+                        <label className="block text-gray-500 text-xs uppercase font-medium">{t('dash.status')}</label>
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mt-1 ${getStatusColor(selectedExpense.status)}`}>
+                            {selectedExpense.status}
+                        </span>
+                    </div>
+                    <div className="col-span-2 border-t pt-4 mt-2">
+                        <div className="flex justify-between py-1">
+                        <span className="text-gray-600">{t('add.subtotal')}</span>
+                        <span>{formatCurrency(selectedExpense.subtotal)}</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                        <span className="text-gray-600">{t('add.tax')}</span>
+                        <span>{formatCurrency(selectedExpense.tax)}</span>
+                        </div>
+                        <div className="flex justify-between py-2 font-bold text-lg border-t mt-2">
+                        <span>{t('add.total')}</span>
+                        <span>{formatCurrency(selectedExpense.total)}</span>
+                        </div>
+                    </div>
+                    {selectedExpense.notes && (
+                        <div className="col-span-2 bg-gray-50 p-3 rounded-lg">
+                        <label className="block text-gray-500 text-xs uppercase font-medium mb-1">{t('add.notes')}</label>
+                        <p className="text-gray-700">{selectedExpense.notes}</p>
+                        </div>
+                    )}
+                    </div>
+                    
+                    {/* Action Buttons - Only if Submitted */}
+                    {selectedExpense.status === ExpenseStatus.SUBMITTED && (
+                        <div className="flex gap-3 pt-4 border-t mt-4">
+                             <Button onClick={handleEditClick} variant="secondary" className="flex-1">
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                {t('action.edit')}
+                            </Button>
+                            <Button onClick={handleDeleteClick} variant="danger" className="flex-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                {t('action.delete')}
+                            </Button>
+                        </div>
+                    )}
+                </>
+            ) : (
+                /* Edit Mode Form */
+                <div className="space-y-4">
+                     <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('add.merchant')}</label>
+                        <input
+                            type="text"
+                            value={editForm.merchant}
+                            onChange={(e) => setEditForm({...editForm, merchant: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                    </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">{t('add.date')}</label>
+                            <input
+                            type="date"
+                            value={editForm.date}
+                            onChange={(e) => setEditForm({...editForm, date: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">{t('add.category')}</label>
+                            <select
+                            value={editForm.category}
+                            onChange={(e) => setEditForm({...editForm, category: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                            >
+                            {Object.values(ExpenseCategory).map(cat => (
+                                <option key={cat} value={cat}>{t(`cat.${cat}`) || cat}</option>
+                            ))}
+                            </select>
+                        </div>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('add.total')}</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            value={editForm.total}
+                            onChange={(e) => setEditForm({...editForm, total: parseFloat(e.target.value)})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('add.notes')}</label>
+                        <textarea
+                            value={editForm.notes}
+                            onChange={(e) => setEditForm({...editForm, notes: e.target.value})}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            rows={2}
+                        />
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t mt-4">
+                        <Button onClick={handleSaveClick} variant="primary" className="flex-1">
+                            <Save className="h-4 w-4 mr-2" />
+                            {t('action.save')}
+                        </Button>
+                        <Button onClick={() => setIsEditing(false)} variant="secondary" className="flex-1">
+                            <X className="h-4 w-4 mr-2" />
+                            {t('action.cancel')}
+                        </Button>
+                    </div>
                 </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-gray-600">{t('add.tax')}</span>
-                  <span>{formatCurrency(selectedExpense.tax)}</span>
-                </div>
-                <div className="flex justify-between py-2 font-bold text-lg border-t mt-2">
-                  <span>{t('add.total')}</span>
-                  <span>{formatCurrency(selectedExpense.total)}</span>
-                </div>
-              </div>
-              {selectedExpense.notes && (
-                <div className="col-span-2 bg-gray-50 p-3 rounded-lg">
-                   <label className="block text-gray-500 text-xs uppercase font-medium mb-1">{t('add.notes')}</label>
-                   <p className="text-gray-700">{selectedExpense.notes}</p>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         )}
       </Modal>
