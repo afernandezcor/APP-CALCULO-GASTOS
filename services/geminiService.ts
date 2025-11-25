@@ -2,9 +2,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ReceiptAnalysisResult } from '../types';
 
 const getClient = () => {
-    const apiKey = process.env.API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-        console.error("API Key not found. Ensure process.env.API_KEY is set.");
+        console.error("Clave de API de Gemini no encontrada. Asegúrese de que VITE_GEMINI_API_KEY esté configurada en Vercel.");
         // In a real scenario, we might throw an error, but for the demo UI we handle gracefully
     }
     return new GoogleGenAI({ apiKey: apiKey || 'dummy-key' });
