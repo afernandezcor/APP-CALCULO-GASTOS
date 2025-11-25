@@ -1,0 +1,7 @@
+{
+  "name": "definitiva",
+  "description": "A smart expense tracking application for field sales teams with AI-powered receipt scanning and a comprehensive management dashboard.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
