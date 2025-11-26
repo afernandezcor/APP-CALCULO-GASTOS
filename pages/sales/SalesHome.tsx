@@ -1,30 +1,41 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useExpenses } from '../../context/ExpenseContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Expense, ExpenseStatus, ExpenseCategory } from '../../types';
-import { Plus, Search, Calendar, CheckCircle, FileText, XCircle, Euro, Filter, Trash2, Edit2, Save, X } from 'lucide-react';
+import { Plus, Search, Calendar, CheckCircle, FileText, XCircle, Euro, Filter, Edit2, Save, X, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { SwipeableItem } from '../../components/SwipeableItem';
 
 export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
   const { user } = useAuth();
-  const { getExpensesByUser, deleteExpense, editExpense } = useExpenses();
+  const { expenses, editExpense, deleteExpense } = useExpenses();
   const { t, formatCurrency, language } = useLanguage();
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [statusFilter, setStatusFilter] = useState<ExpenseStatus | 'ALL'>('ALL');
   
+  // Delete Confirmation State
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  
+  // Animation State for Detail Modal
+  const [isSlideOut, setIsSlideOut] = useState(false);
+
   // Edit Mode State
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
 
   // Date Filters
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth()); // 0-11, or -1 for All
+  const [selectedMonth, setSelectedMonth] = useState<number>(-1); // Default to All Months
 
-  const myExpenses = getExpensesByUser(user?.id || '');
+  // Filter expenses directly from context to ensure reactivity
+  const myExpenses = useMemo(() => {
+    return expenses.filter(e => e.userId === user?.id);
+  }, [expenses, user?.id]);
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June', 
@@ -80,32 +91,64 @@ export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navi
     }
   };
 
-  const handleEditClick = () => {
+  const handleEditClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
       if (selectedExpense) {
           setEditForm(selectedExpense);
           setIsEditing(true);
       }
   };
 
-  const handleSaveClick = () => {
+  const handleSaveClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
       if (selectedExpense && editForm) {
           editExpense(selectedExpense.id, editForm);
           setSelectedExpense({ ...selectedExpense, ...editForm } as Expense);
           setIsEditing(false);
       }
   };
+  
+  const handleSwipeDelete = (expense: Expense) => {
+      setExpenseToDelete(expense);
+      setIsDeleteModalOpen(true);
+  };
 
-  const handleDeleteClick = () => {
-      if (selectedExpense && window.confirm(t('action.deleteConfirm'))) {
-          deleteExpense(selectedExpense.id);
-          setSelectedExpense(null);
-          setIsEditing(false);
+  const handleDeleteRequestFromModal = () => {
+      if (selectedExpense) {
+          // Trigger slide out animation
+          setIsSlideOut(true);
+          
+          // Wait for animation to finish before showing confirmation
+          setTimeout(() => {
+            setExpenseToDelete(selectedExpense);
+            setIsDeleteModalOpen(true);
+            setSelectedExpense(null); // Close the detail modal
+            setIsSlideOut(false); // Reset animation state
+          }, 300);
       }
+  };
+  
+  const confirmDelete = () => {
+      if (expenseToDelete) {
+          deleteExpense(expenseToDelete.id);
+          setIsDeleteModalOpen(false);
+          setExpenseToDelete(null);
+      }
+  };
+
+  const cancelDelete = () => {
+      setIsDeleteModalOpen(false);
+      setExpenseToDelete(null);
   };
 
   // Reset edit state when modal closes or expense changes
   useEffect(() => {
-      if (!selectedExpense) setIsEditing(false);
+      if (!selectedExpense) {
+          setIsEditing(false);
+          setIsSlideOut(false);
+      }
   }, [selectedExpense]);
 
   return (
@@ -252,10 +295,10 @@ export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navi
               </div>
             ) : (
               filteredExpenses.map(expense => (
-                <div 
-                  key={expense.id} 
-                  className="p-4 hover:bg-gray-50 cursor-pointer transition-colors flex items-center justify-between"
-                  onClick={() => setSelectedExpense(expense)}
+                <SwipeableItem 
+                    key={expense.id} 
+                    onSwipe={() => handleSwipeDelete(expense)}
+                    onClick={() => setSelectedExpense(expense)}
                 >
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
@@ -278,12 +321,45 @@ export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navi
                       {expense.status}
                     </span>
                   </div>
-                </div>
+                </SwipeableItem>
               ))
             )}
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={cancelDelete}
+        title="Delete Expense"
+      >
+        <div className="flex flex-col items-center text-center space-y-4 p-4">
+            <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">Are you sure?</h3>
+            <p className="text-gray-500 text-sm max-w-xs">
+                Do you want to delete the expense for <strong>{expenseToDelete?.merchant}</strong>? All information related to this expense will be permanently deleted.
+            </p>
+            <div className="flex gap-3 w-full mt-4">
+                <Button 
+                    variant="danger" 
+                    className="flex-1 bg-red-600 hover:bg-red-700 border-transparent text-white"
+                    onClick={confirmDelete}
+                >
+                    Yes, Delete
+                </Button>
+                <Button 
+                    variant="secondary" 
+                    className="flex-1"
+                    onClick={cancelDelete}
+                >
+                    No, Cancel
+                </Button>
+            </div>
+        </div>
+      </Modal>
 
       {/* Detail Modal */}
       <Modal 
@@ -292,7 +368,7 @@ export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navi
         title={isEditing ? t('action.edit') : "Expense Details"}
       >
         {selectedExpense && (
-          <div className="space-y-6">
+          <div className={`space-y-6 transition-transform duration-300 ${isSlideOut ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'}`}>
             <div className="aspect-[3/4] w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
               <img 
                 src={selectedExpense.imageUrl} 
@@ -345,14 +421,23 @@ export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navi
                     )}
                     </div>
                     
-                    {/* Action Buttons - Only if Submitted */}
+                    {/* Action Buttons - Submit Only */}
                     {selectedExpense.status === ExpenseStatus.SUBMITTED && (
                         <div className="flex gap-3 pt-4 border-t mt-4">
-                             <Button onClick={handleEditClick} variant="secondary" className="flex-1">
+                             <Button onClick={handleEditClick} variant="secondary" className="flex-1" type="button">
                                 <Edit2 className="h-4 w-4 mr-2" />
                                 {t('action.edit')}
                             </Button>
-                            <Button onClick={handleDeleteClick} variant="danger" className="flex-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200">
+                            <Button 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleDeleteRequestFromModal();
+                                }} 
+                                variant="danger" 
+                                className="flex-1 bg-red-600 hover:bg-red-700 border-transparent text-white" 
+                                type="button"
+                            >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 {t('action.delete')}
                             </Button>
@@ -415,11 +500,11 @@ export const SalesHome: React.FC<{ navigate: (path: string) => void }> = ({ navi
                     </div>
 
                     <div className="flex gap-3 pt-4 border-t mt-4">
-                        <Button onClick={handleSaveClick} variant="primary" className="flex-1">
+                        <Button onClick={handleSaveClick} variant="primary" className="flex-1" type="button">
                             <Save className="h-4 w-4 mr-2" />
                             {t('action.save')}
                         </Button>
-                        <Button onClick={() => setIsEditing(false)} variant="secondary" className="flex-1">
+                        <Button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(false); }} variant="secondary" className="flex-1" type="button">
                             <X className="h-4 w-4 mr-2" />
                             {t('action.cancel')}
                         </Button>

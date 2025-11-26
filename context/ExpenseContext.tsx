@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Expense, ExpenseStatus } from '../types';
 import { MOCK_EXPENSES } from '../mockData';
@@ -9,6 +8,7 @@ interface ExpenseContextType {
   updateStatus: (id: string, status: ExpenseStatus, notes?: string) => void;
   getExpensesByUser: (userId: string) => Expense[];
   deleteExpense: (id: string) => void;
+  deleteExpensesByUserId: (userId: string) => void;
   editExpense: (id: string, updatedExpense: Partial<Expense>) => void;
 }
 
@@ -20,12 +20,15 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const savedExpenses = localStorage.getItem('track_expense_data');
     if (savedExpenses) {
       try {
-        return JSON.parse(savedExpenses);
+        const parsed = JSON.parse(savedExpenses);
+        // Ensure we don't crash if parsed data is not an array
+        return Array.isArray(parsed) ? parsed : MOCK_EXPENSES;
       } catch (e) {
         console.error("Failed to parse expenses", e);
         return MOCK_EXPENSES;
       }
     }
+    // First time load: use mock data
     return MOCK_EXPENSES;
   });
 
@@ -35,7 +38,18 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         localStorage.setItem('track_expense_data', JSON.stringify(expenses));
     } catch (error) {
         console.error("Failed to save expenses to LocalStorage. Storage might be full.", error);
-        // Note: In a production app, we would likely trigger a global toast notification here
+        
+        // Attempt Fallback: Save expenses BUT remove images from the new data to save space
+        try {
+            console.log("Attempting fallback save (removing images)...");
+            const lightweightExpenses = expenses.map(e => ({
+                ...e,
+                imageUrl: '' // Strip image to save text data
+            }));
+            localStorage.setItem('track_expense_data', JSON.stringify(lightweightExpenses));
+        } catch (retryError) {
+            console.error("Critical: Failed to save even without images.", retryError);
+        }
     }
   }, [expenses]);
 
@@ -53,7 +67,13 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteExpense = (id: string) => {
+    // Simplified logic: Just filter the array. 
+    // The useEffect above will handle saving to localStorage automatically (just like updateStatus).
     setExpenses(prev => prev.filter(exp => exp.id !== id));
+  };
+
+  const deleteExpensesByUserId = (userId: string) => {
+    setExpenses(prev => prev.filter(exp => exp.userId !== userId));
   };
 
   const editExpense = (id: string, updatedExpense: Partial<Expense>) => {
@@ -70,7 +90,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   return (
-    <ExpenseContext.Provider value={{ expenses, addExpense, updateStatus, getExpensesByUser, deleteExpense, editExpense }}>
+    <ExpenseContext.Provider value={{ expenses, addExpense, updateStatus, getExpensesByUser, deleteExpense, editExpense, deleteExpensesByUserId }}>
       {children}
     </ExpenseContext.Provider>
   );

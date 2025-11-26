@@ -2,10 +2,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ReceiptAnalysisResult } from '../types';
 
 const getClient = () => {
+    // The API key must be obtained exclusively from the environment variable process.env.API_KEY
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
         console.error("API Key not found. Ensure process.env.API_KEY is set.");
-        // In a real scenario, we might throw an error, but for the demo UI we handle gracefully
     }
     return new GoogleGenAI({ apiKey: apiKey || 'dummy-key' });
 };
@@ -28,7 +28,16 @@ export const analyzeReceiptImage = async (base64Image: string): Promise<ReceiptA
                         }
                     },
                     {
-                        text: "Analyze this receipt image. Extract the merchant name, date (YYYY-MM-DD format), subtotal, tax, total, and suggest a category (Restaurant, Hotel, Transport, Supplies, Miscellaneous). If a value is not found, return 0 or empty string."
+                        text: `Analyze this receipt image. Extract the merchant name, date, subtotal, tax, total, and suggest a category (Restaurant, Hotel, Transport, Supplies, Miscellaneous). 
+                        
+                        CRITICAL DATE PARSING RULES:
+                        1. Look for the currency symbol. 
+                        2. If the currency is EURO (€) or the language is Spanish/French/German, you MUST interpret the date format on the paper as DD/MM/YYYY (Day first).
+                           Example: "05/04/2025" in a Euro receipt is April 5th (2025-04-05).
+                        3. If the currency is Dollar ($) or US-based, interpret as MM/DD/YYYY (Month first).
+                        4. ALWAYS return the final extracted date strictly in ISO 8601 format: YYYY-MM-DD.
+                        
+                        If the year is 2 digits (e.g., /25), assume 2025. If a value is not found, return 0 or empty string.`
                     }
                 ]
             },

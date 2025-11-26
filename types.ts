@@ -12,6 +12,11 @@ export interface User {
   role: UserRole;
   avatar?: string;
   password?: string;
+  pendingUpdates?: {
+    name: string;
+    email: string;
+    date: string;
+  };
 }
 
 export enum ExpenseStatus {

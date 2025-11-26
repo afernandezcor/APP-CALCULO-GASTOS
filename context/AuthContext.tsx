@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { MOCK_USERS } from '../mockData';
@@ -10,6 +11,10 @@ interface AuthContextType {
   logout: () => void;
   updateUserRole: (userId: string, newRole: UserRole) => void;
   updateUserAvatar: (userId: string, avatarUrl: string) => void;
+  updateUserPassword: (userId: string, password: string) => void;
+  requestProfileUpdate: (userId: string, name: string, email: string) => void;
+  resolveProfileUpdate: (userId: string, approve: boolean) => void;
+  deleteUser: (userId: string) => void;
   isLoading: boolean;
 }
 
@@ -78,6 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedUsers = [...allUsers, newUser];
     setAllUsers(updatedUsers);
     setUser(newUser);
+    
+    // Force immediate save
+    localStorage.setItem('track_expense_users', JSON.stringify(updatedUsers));
     localStorage.setItem('billboard_user_id', newUser.id);
   };
 
@@ -96,13 +104,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUserPassword = (userId: string, password: string) => {
+    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, password: password } : u));
+    if (user && user.id === userId) {
+        setUser(prev => prev ? { ...prev, password: password } : null);
+    }
+  };
+
+  const requestProfileUpdate = (userId: string, name: string, email: string) => {
+    setAllUsers(prev => prev.map(u => {
+      if (u.id === userId) {
+        return {
+          ...u,
+          pendingUpdates: {
+            name,
+            email,
+            date: new Date().toISOString()
+          }
+        };
+      }
+      return u;
+    }));
+    
+    if (user && user.id === userId) {
+      setUser(prev => prev ? {
+          ...prev,
+          pendingUpdates: {
+            name,
+            email,
+            date: new Date().toISOString()
+          }
+      } : null);
+    }
+  };
+
+  const resolveProfileUpdate = (userId: string, approve: boolean) => {
+    setAllUsers(prev => prev.map(u => {
+      if (u.id === userId && u.pendingUpdates) {
+        if (approve) {
+          return {
+            ...u,
+            name: u.pendingUpdates.name,
+            email: u.pendingUpdates.email,
+            pendingUpdates: undefined
+          };
+        } else {
+          return {
+            ...u,
+            pendingUpdates: undefined
+          };
+        }
+      }
+      return u;
+    }));
+  };
+
+  const deleteUser = (userId: string) => {
+    setAllUsers(prev => {
+        const newUsers = prev.filter(u => u.id !== userId);
+        // Force immediate save
+        localStorage.setItem('track_expense_users', JSON.stringify(newUsers));
+        return newUsers;
+    });
+    
+    // If deleting self (unlikely from admin panel, but possible), logout
+    if (user && user.id === userId) {
+        logout();
+    }
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('billboard_user_id');
   };
 
   return (
-    <AuthContext.Provider value={{ user, allUsers, login, signup, logout, updateUserRole, updateUserAvatar, isLoading }}>
+    <AuthContext.Provider value={{ user, allUsers, login, signup, logout, updateUserRole, updateUserAvatar, updateUserPassword, requestProfileUpdate, resolveProfileUpdate, deleteUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

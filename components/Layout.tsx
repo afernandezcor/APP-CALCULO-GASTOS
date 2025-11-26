@@ -1,9 +1,9 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { UserRole } from '../types';
-import { LogOut, LayoutDashboard, PlusCircle, List, PieChart, FileSpreadsheet, User as UserIcon, Shield, Activity, Globe, Euro, Upload, Camera, X, Menu } from 'lucide-react';
+import { LogOut, LayoutDashboard, PlusCircle, List, PieChart, FileSpreadsheet, User as UserIcon, Shield, Activity, Globe, Euro, Upload, Camera, X, Menu, AlertCircle } from 'lucide-react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 
@@ -14,12 +14,26 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate }) => {
-  const { user, logout, updateUserAvatar } = useAuth();
+  const { user, logout, updateUserAvatar, requestProfileUpdate, updateUserPassword } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   
-  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Profile Form State
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user && isProfileModalOpen) {
+      setEditName(user.name);
+      setEditEmail(user.email);
+      setEditPassword(''); // Reset password field
+    }
+  }, [user, isProfileModalOpen]);
 
   if (!user) return <>{children}</>;
 
@@ -28,7 +42,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
   const isManagerOrAdmin = isManager || isAdmin;
 
   const handleAvatarClick = () => {
-    setIsAvatarModalOpen(true);
+    setIsProfileModalOpen(true);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,7 +53,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
     reader.onloadend = () => {
       const base64String = reader.result as string;
       updateUserAvatar(user.id, base64String);
-      setIsAvatarModalOpen(false);
     };
     reader.readAsDataURL(file);
   };
@@ -48,6 +61,24 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
     navigate(path);
     setIsMobileMenuOpen(false);
   };
+
+  const handleProfileUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Handle Profile Requests (Pending Approval)
+    if (editName !== user.name || editEmail !== user.email) {
+      requestProfileUpdate(user.id, editName, editEmail);
+    }
+
+    // Handle Password Update (Immediate)
+    if (editPassword) {
+      updateUserPassword(user.id, editPassword);
+    }
+
+    setIsProfileModalOpen(false);
+  };
+
+  const hasChanges = editName !== user.name || editEmail !== user.email || editPassword.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
@@ -175,7 +206,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
             <div 
               className="flex items-center gap-3 px-3 py-2 mb-2 cursor-pointer hover:bg-gray-100 rounded-lg transition-colors group relative"
               onClick={handleAvatarClick}
-              title={t('profile.changeAvatar')}
+              title={t('profile.title')}
             >
                <div className="relative">
                  {user.avatar ? (
@@ -218,14 +249,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
         {children}
       </main>
 
-      {/* Avatar Upload Modal */}
+      {/* Profile Edit Modal */}
       <Modal 
-        isOpen={isAvatarModalOpen} 
-        onClose={() => setIsAvatarModalOpen(false)}
-        title={t('profile.changeAvatar')}
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)}
+        title={t('profile.title')}
       >
         <div className="flex flex-col items-center space-y-6 py-4">
-           <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-100 shadow-lg relative bg-gray-50">
+           {/* Avatar Section */}
+           <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-100 shadow-lg relative bg-gray-50 group">
              {user.avatar ? (
                <img src={user.avatar} alt="current avatar" className="w-full h-full object-cover" />
              ) : (
@@ -233,21 +265,73 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
                  <UserIcon className="w-12 h-12 text-gray-300" />
                </div>
              )}
+              {/* Image Upload Overlay */}
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 flex items-center justify-center cursor-pointer transition-all"
+              >
+                  <Upload className="text-white opacity-0 group-hover:opacity-100" />
+              </div>
            </div>
            
-           <div className="w-full flex flex-col gap-3">
-             <input 
-               type="file" 
-               ref={fileInputRef} 
-               className="hidden" 
-               accept="image/*"
-               onChange={handleFileChange}
-             />
-             <Button onClick={() => fileInputRef.current?.click()} className="w-full">
-                <Upload className="h-4 w-4 mr-2" />
-                {t('profile.uploadNew')}
-             </Button>
-           </div>
+           <input 
+             type="file" 
+             ref={fileInputRef} 
+             className="hidden" 
+             accept="image/*"
+             onChange={handleFileChange}
+           />
+           
+           <div className="text-xs text-gray-500 -mt-4">{t('profile.changeAvatar')}</div>
+
+           {/* User Info Form */}
+           <form onSubmit={handleProfileUpdate} className="w-full space-y-4">
+              {user.pendingUpdates && (
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{t('profile.pending')}</span>
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('signup.name')}</label>
+                <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    disabled={!!user.pendingUpdates}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('login.email')}</label>
+                <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    disabled={!!user.pendingUpdates}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.newPassword')}</label>
+                <input
+                    type="password"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {(hasChanges || (editPassword.length > 0)) && (
+                  <Button type="submit" className="w-full">
+                    {t('action.save')}
+                  </Button>
+              )}
+           </form>
         </div>
       </Modal>
     </div>

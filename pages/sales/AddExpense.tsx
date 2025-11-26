@@ -11,16 +11,20 @@ import { Camera, Upload, ArrowLeft, Save, Wand2 } from 'lucide-react';
 // Simple UUID generator
 const simpleId = () => Math.random().toString(36).substring(2, 15);
 
-// Image Compression Utility
-const compressImage = (base64Str: string, maxWidth = 1024, quality = 0.7): Promise<string> => {
+// Legacy fallback for browsers that don't support createImageBitmap or if it fails
+const compressImageLegacy = (file: File, maxWidth: number, quality: number): Promise<string> => {
   return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
     const img = new Image();
-    img.src = base64Str;
+    img.src = objectUrl;
+
     img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
 
+      // Calculate new dimensions
       if (width > maxWidth) {
         height = (height * maxWidth) / width;
         width = maxWidth;
@@ -30,14 +34,66 @@ const compressImage = (base64Str: string, maxWidth = 1024, quality = 0.7): Promi
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'medium'; 
           ctx.drawImage(img, 0, 0, width, height);
           resolve(canvas.toDataURL('image/jpeg', quality));
       } else {
-          resolve(base64Str); // Fallback
+          resolve(""); 
       }
     };
-    img.onerror = () => resolve(base64Str); // Fallback
+
+    img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        console.warn("Legacy image load failed");
+        resolve(""); 
+    };
   });
+};
+
+// Memory Optimized Compression using createImageBitmap with Hardware Resizing
+const compressImageFile = async (file: File, maxWidth = 600, quality = 0.5): Promise<string> => {
+  if (typeof createImageBitmap === 'function') {
+      try {
+          // CRITICAL FIX: Pass resize options DIRECTLY to the decoder.
+          // This tells the GPU to downscale the 50MP image BEFORE it hits the JS memory.
+          // This prevents the "Aw Snap" memory crash.
+          const bitmap = await createImageBitmap(file, { 
+            resizeWidth: maxWidth,
+            resizeQuality: 'medium'
+          });
+          
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+              bitmap.close();
+              return "";
+          }
+
+          ctx.drawImage(bitmap, 0, 0);
+          
+          // Immediately release bitmap memory
+          bitmap.close(); 
+
+          return canvas.toDataURL('image/jpeg', quality);
+      } catch (e) {
+          console.warn("Hardware scaling failed, trying standard bitmap...", e);
+          // If the specific resize options fail, try standard bitmap, then legacy
+          try {
+             const bitmap = await createImageBitmap(file);
+             // ... manual resize logic would go here, but risking crash.
+             // simpler to fall back to legacy if hardware resize fails.
+             bitmap.close();
+             return compressImageLegacy(file, maxWidth, quality);
+          } catch (e2) {
+             return compressImageLegacy(file, maxWidth, quality);
+          }
+      }
+  }
+  return compressImageLegacy(file, maxWidth, quality);
 };
 
 export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
@@ -59,39 +115,57 @@ export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ nav
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 1. Clear previous state to free memory
+    setImagePreview(null);
     setIsCompressing(true);
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const originalBase64 = reader.result as string;
-      
-      // Compress the image immediately
-      const compressedBase64 = await compressImage(originalBase64);
-      setImagePreview(compressedBase64);
-      setIsCompressing(false);
-      setStep('analyzing');
-      
-      // Call Gemini API with the COMPRESSED image (faster and cheaper)
-      const result = await analyzeReceiptImage(compressedBase64);
-      
-      setFormData({
-        merchant: result.merchant,
-        date: result.date || new Date().toISOString().split('T')[0],
-        subtotal: result.subtotal || 0,
-        tax: result.tax || 0,
-        total: result.total || 0,
-        category: result.category || ExpenseCategory.MISC,
-        notes: ''
-      });
-      
-      setStep('edit');
-    };
-    reader.readAsDataURL(file);
+    try {
+        // 2. Compress using memory-efficient method
+        // Using 600px width is plenty for AI and keeps base64 string small
+        const compressedBase64 = await compressImageFile(file, 600, 0.5);
+        
+        if (!compressedBase64) {
+            throw new Error("Compression failed");
+        }
+
+        setImagePreview(compressedBase64);
+        setStep('analyzing');
+        
+        // 3. Call Gemini API with the COMPRESSED image
+        const result = await analyzeReceiptImage(compressedBase64);
+        
+        // Ensure date is valid, fallback to Today if Gemini fails to find one
+        let validDate = result.date;
+        if (!validDate || isNaN(Date.parse(validDate))) {
+            validDate = new Date().toISOString().split('T')[0];
+        }
+
+        setFormData({
+          merchant: result.merchant || '',
+          date: validDate,
+          subtotal: result.subtotal || 0,
+          tax: result.tax || 0,
+          total: result.total || 0,
+          category: result.category || ExpenseCategory.MISC,
+          notes: ''
+        });
+        
+        setStep('edit');
+    } catch (error) {
+        console.error("Error processing image", error);
+        alert("Error processing image. Please try again.");
+        setStep('upload');
+    } finally {
+        setIsCompressing(false);
+        // Reset inputs so the same file can be selected again if needed
+        if (e.target) e.target.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,24 +174,24 @@ export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ nav
 
     try {
         addExpense({
-        id: simpleId(),
-        userId: user.id,
-        userName: user.name,
-        merchant: formData.merchant,
-        date: formData.date,
-        subtotal: formData.subtotal,
-        tax: formData.tax,
-        total: formData.total,
-        category: formData.category,
-        imageUrl: imagePreview || '',
-        status: ExpenseStatus.SUBMITTED,
-        notes: formData.notes,
-        createdAt: new Date().toISOString()
+          id: simpleId(),
+          userId: user.id,
+          userName: user.name,
+          merchant: formData.merchant,
+          date: formData.date,
+          subtotal: formData.subtotal,
+          tax: formData.tax,
+          total: formData.total,
+          category: formData.category,
+          imageUrl: imagePreview || '',
+          status: ExpenseStatus.SUBMITTED,
+          notes: formData.notes,
+          createdAt: new Date().toISOString()
         });
 
         navigate('/my-expenses');
     } catch (error) {
-        alert("Error saving expense. Storage might be full.");
+        alert("Error saving expense. Local storage might be full.");
         console.error(error);
     }
   };
@@ -139,7 +213,8 @@ export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ nav
           <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('add.capture')}</h3>
           <p className="text-gray-500 mb-6 max-w-xs mx-auto">{t('add.captureDesc')}</p>
           
-          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md justify-center">
+          <div className="flex flex-col gap-4 w-full max-w-md justify-center">
+            {/* Standard File Upload */}
             <input 
               type="file" 
               accept="image/*" 
@@ -147,14 +222,35 @@ export const AddExpense: React.FC<{ navigate: (path: string) => void }> = ({ nav
               ref={fileInputRef}
               onChange={handleFileChange}
             />
+            {/* Camera Capture Input (Rear Camera) */}
+            <input 
+              type="file" 
+              accept="image/*"
+              capture="environment" 
+              className="hidden" 
+              ref={cameraInputRef}
+              onChange={handleFileChange}
+            />
+            
+            <Button 
+                onClick={() => cameraInputRef.current?.click()} 
+                size="lg" 
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                isLoading={isCompressing}
+            >
+              <Camera className="h-5 w-5 mr-2" />
+              {t('add.takePhoto')}
+            </Button>
+
              <Button 
                 onClick={() => fileInputRef.current?.click()} 
                 size="lg" 
+                variant="secondary"
                 className="w-full"
                 isLoading={isCompressing}
             >
-              <Upload className="h-4 w-4 mr-2" />
-              {t('add.upload')}
+              <Upload className="h-5 w-5 mr-2" />
+              {t('add.uploadGallery')}
             </Button>
           </div>
         </div>

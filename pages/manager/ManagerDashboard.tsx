@@ -20,7 +20,7 @@ export const ManagerDashboard: React.FC<{ navigate: (path: string) => void }> = 
   
   // Date Filters
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth()); // 0-11, or -1 for All
+  const [selectedMonth, setSelectedMonth] = useState<number>(-1); // Default to All Months
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June', 
@@ -309,9 +309,9 @@ export const ManagerDashboard: React.FC<{ navigate: (path: string) => void }> = 
                 )}
               </div>
 
-              <div className="pt-6 border-t flex gap-3 mt-4">
+              <div className="pt-6 border-t mt-4 space-y-3">
                 {selectedExpense.status === ExpenseStatus.SUBMITTED ? (
-                  <>
+                  <div className="flex gap-3">
                      <Button 
                       variant="primary" 
                       className="flex-1 bg-green-600 hover:bg-green-700 border-transparent"
@@ -326,7 +326,7 @@ export const ManagerDashboard: React.FC<{ navigate: (path: string) => void }> = 
                     >
                       Reject
                     </Button>
-                  </>
+                  </div>
                 ) : (
                   <div className={`w-full text-center py-2 rounded-lg font-medium ${getStatusColor(selectedExpense.status)}`}>
                     Expense is {selectedExpense.status}

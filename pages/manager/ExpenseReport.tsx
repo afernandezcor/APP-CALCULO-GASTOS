@@ -1,10 +1,11 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useExpenses } from '../../context/ExpenseContext';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { ExpenseCategory, UserRole } from '../../types';
 import { Button } from '../../components/Button';
-import { Download, Plus, Trash2 } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface EditableRow {
@@ -135,10 +136,6 @@ export const ExpenseReport: React.FC = () => {
       isManual: true
     };
     setEditableRows([...editableRows, newRow]);
-  };
-
-  const handleDeleteRow = (id: string) => {
-    setEditableRows(editableRows.filter(row => row.id !== id));
   };
 
   // Calculate Totals from Editable Rows
@@ -343,7 +340,6 @@ export const ExpenseReport: React.FC = () => {
                         <th colSpan={1}></th>
                         <th className="border border-black bg-white font-bold text-center">{t('excel.highway')}</th>
                         <th colSpan={5} className="border border-black bg-gray-100 font-bold text-center">{t('excel.means')}</th>
-                        <th className="bg-white border-none"></th>
                     </tr>
                     <tr className="bg-white">
                         <th className="border border-black p-1 w-24">{t('col.day')}</th>
@@ -356,7 +352,6 @@ export const ExpenseReport: React.FC = () => {
                         <th className="border border-black p-1 w-24">{t('col.transport')}</th>
                         <th className="border border-black p-1 w-20">{t('col.misc')}</th>
                         <th className="border border-black p-1 w-20">{t('col.total')}</th>
-                        <th className="w-8 border-none"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -436,13 +431,6 @@ export const ExpenseReport: React.FC = () => {
                             </td>
                             <td className="border border-gray-400 px-1 text-right bg-gray-50 font-medium flex items-center justify-end h-full">
                                 {formatCurrency(row.total)}
-                            </td>
-                             <td className="border-none px-2">
-                                {row.isManual && (
-                                    <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600">
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
-                                )}
                             </td>
                         </tr>
                     ))}

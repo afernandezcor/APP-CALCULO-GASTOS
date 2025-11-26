@@ -67,6 +67,8 @@ const translations: Record<Language, Record<string, string>> = {
     'add.capture': 'Capture Receipt',
     'add.captureDesc': 'Take a photo or upload an image of your receipt to automatically extract details.',
     'add.upload': 'Upload / Take Photo',
+    'add.takePhoto': 'Take Photo',
+    'add.uploadGallery': 'Upload from Gallery',
     'add.analyzing': 'AI Analyzing...',
     'add.analyzingDesc': 'Gemini is reading your receipt details.',
     'add.merchant': 'Merchant',
@@ -133,13 +135,24 @@ const translations: Record<Language, Record<string, string>> = {
     'users.desc': 'Manage user roles and access permissions.',
     'users.user': 'User',
     'users.email': 'Email',
+    'users.password': 'Password',
     'users.role': 'Current Role',
     'users.actions': 'Actions',
+    'users.deleteTitle': 'Delete User',
+    'users.deleteConfirm': 'Are you sure you want to delete this user? This will also remove their access.',
+    'users.pendingChanges': 'Pending Changes',
+    'users.approveChange': 'Approve',
+    'users.rejectChange': 'Reject',
+    'users.requested': 'Requested',
     
     // Profile
+    'profile.title': 'Edit Profile',
     'profile.changeAvatar': 'Change Profile Picture',
     'profile.uploadNew': 'Upload New Photo',
-    'profile.remove': 'Remove Photo'
+    'profile.remove': 'Remove Photo',
+    'profile.requestUpdate': 'Request Update',
+    'profile.pending': 'Update Pending Approval',
+    'profile.newPassword': 'New Password (Optional)'
   },
   es: {
     // Auth
@@ -197,6 +210,8 @@ const translations: Record<Language, Record<string, string>> = {
     'add.capture': 'Capturar Recibo',
     'add.captureDesc': 'Toma una foto o sube una imagen para extraer detalles automáticamente.',
     'add.upload': 'Subir / Tomar Foto',
+    'add.takePhoto': 'Hacer Foto',
+    'add.uploadGallery': 'Subir desde Galería',
     'add.analyzing': 'IA Analizando...',
     'add.analyzingDesc': 'Gemini está leyendo los detalles del recibo.',
     'add.merchant': 'Comercio',
@@ -263,13 +278,24 @@ const translations: Record<Language, Record<string, string>> = {
     'users.desc': 'Gestionar roles y permisos de usuarios.',
     'users.user': 'Usuario',
     'users.email': 'Email',
+    'users.password': 'Contraseña',
     'users.role': 'Rol Actual',
     'users.actions': 'Acciones',
+    'users.deleteTitle': 'Eliminar Usuario',
+    'users.deleteConfirm': '¿Estás seguro de que deseas eliminar este usuario? Esto también eliminará su acceso.',
+    'users.pendingChanges': 'Cambios Pendientes',
+    'users.approveChange': 'Aprobar',
+    'users.rejectChange': 'Rechazar',
+    'users.requested': 'Solicitado',
 
      // Profile
+    'profile.title': 'Editar Perfil',
     'profile.changeAvatar': 'Cambiar Foto de Perfil',
     'profile.uploadNew': 'Subir Nueva Foto',
-    'profile.remove': 'Eliminar Foto'
+    'profile.remove': 'Eliminar Foto',
+    'profile.requestUpdate': 'Solicitar Cambio',
+    'profile.pending': 'Cambio Pendiente de Aprobación',
+    'profile.newPassword': 'Nueva Contraseña (Opcional)'
   },
   fr: {
     // Auth
@@ -327,6 +353,8 @@ const translations: Record<Language, Record<string, string>> = {
     'add.capture': 'Scanner le reçu',
     'add.captureDesc': 'Prenez une photo ou téléchargez une image pour extraire automatiquement les détails.',
     'add.upload': 'Télécharger / Photo',
+    'add.takePhoto': 'Prendre une photo',
+    'add.uploadGallery': 'Depuis la galerie',
     'add.analyzing': 'Analyse IA...',
     'add.analyzingDesc': 'Gemini lit les détails de votre reçu.',
     'add.merchant': 'Marchand',
@@ -393,13 +421,24 @@ const translations: Record<Language, Record<string, string>> = {
     'users.desc': 'Gérer les rôles et les permissions des utilisateurs.',
     'users.user': 'Utilisateur',
     'users.email': 'Email',
+    'users.password': 'Mot de passe',
     'users.role': 'Rôle actuel',
     'users.actions': 'Actions',
+    'users.deleteTitle': 'Supprimer l\'utilisateur',
+    'users.deleteConfirm': 'Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cela supprimera également son accès.',
+    'users.pendingChanges': 'Modifications en attente',
+    'users.approveChange': 'Approuver',
+    'users.rejectChange': 'Rejeter',
+    'users.requested': 'Demandé',
 
     // Profile
+    'profile.title': 'Modifier le profil',
     'profile.changeAvatar': 'Changer la photo de profil',
     'profile.uploadNew': 'Télécharger nouvelle photo',
-    'profile.remove': 'Supprimer la photo'
+    'profile.remove': 'Supprimer la photo',
+    'profile.requestUpdate': 'Demander une mise à jour',
+    'profile.pending': 'Mise à jour en attente d\'approbation',
+    'profile.newPassword': 'Nouveau mot de passe (Optionnel)'
   }
 };
 
