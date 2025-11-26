@@ -2,19 +2,18 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ReceiptAnalysisResult } from '../types';
 
 const getClient = () => {
-    // Safely retrieve API Key strictly from process.env.API_KEY as per guidelines
-    // We add a safety check for 'process' to avoid ReferenceError in browser-only environments
-    let key = '';
-    try {
-        // @ts-ignore
-        if (typeof process !== 'undefined' && process.env) {
-            key = process.env.API_KEY;
-        }
-    } catch (e) {
-        console.warn("process.env.API_KEY access failed");
+    // 1. Usa el nombre de variable de entorno que estás usando en el código (API_KEY)
+    const apiKey = process.env.API_KEY;
+
+    // 2. ¡Comprobación estricta! Si no existe, lanza un error claro.
+    if (!apiKey) {
+        // Esto causará que el build o la ejecución falle, pero con un mensaje claro.
+        // Es mejor que falle aquí que en producción por un error desconocido.
+        throw new Error("La clave de API (process.env.API_KEY) no está configurada.");
     }
-    
-    return new GoogleGenAI({ apiKey: key });
+
+    // 3. TypeScript sabe que 'apiKey' ahora es definitivamente un 'string'.
+    return new GoogleGenAI({ apiKey });
 };
 
 export const analyzeReceiptImage = async (base64Image: string): Promise<ReceiptAnalysisResult> => {
