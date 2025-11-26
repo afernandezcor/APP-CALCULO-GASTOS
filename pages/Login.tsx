@@ -167,22 +167,12 @@ export const Login: React.FC<{ navigate: (path: string) => void }> = ({ navigate
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-gray-400 bg-gray-50/80 p-3 rounded-lg border border-gray-100">
-             <p className="font-semibold mb-1">{t('login.demo')}:</p>
-             <div className="space-y-1">
-               <div className="flex justify-between px-4">
-                 <span>Sales:</span> <span className="font-mono text-gray-600">alex@billboard.com</span>
-               </div>
-               <div className="flex justify-between px-4">
-                 <span>Manager:</span> <span className="font-mono text-gray-600">jordan@billboard.com</span>
-               </div>
-               <div className="flex justify-between px-4">
-                 <span>Admin:</span> <span className="font-mono text-gray-600">admin@billboard.com</span>
-               </div>
-                <div className="flex justify-between px-4 border-t border-gray-200 pt-1 mt-1">
-                 <span>Password:</span> <span className="font-mono text-gray-600">123456</span>
-               </div>
-             </div>
+          <div className="mt-8 flex justify-center">
+             <img 
+               src="https://www.cmovalves.com/wp-content/uploads/2020/10/logo-cmo-valves.png" 
+               alt="CMO Valves" 
+               className="h-16 w-auto object-contain opacity-90 hover:opacity-100 transition-opacity"
+             />
           </div>
         </div>
         <div className="bg-gray-50/90 px-8 py-4 text-center text-sm text-gray-600 border-t border-gray-100">
