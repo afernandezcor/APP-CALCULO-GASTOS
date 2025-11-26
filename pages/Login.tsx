@@ -112,6 +112,7 @@ export const Login: React.FC<{ navigate: (path: string) => void }> = ({ navigate
       }`}>
         <div className="p-8">
           <div className="flex justify-between items-start mb-6">
+             {/* Original Track Expense Logo */}
              <div className="bg-blue-600 p-3 rounded-xl shadow-lg">
                 <Euro className="h-8 w-8 text-white" />
              </div>
@@ -138,7 +139,7 @@ export const Login: React.FC<{ navigate: (path: string) => void }> = ({ navigate
                 id="email"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white/80"
-                placeholder="name@billboard.com"
+                placeholder="name@cmovalves.com"
                 value={email}
                 onChange={handleInputChange}
               />
@@ -167,11 +168,13 @@ export const Login: React.FC<{ navigate: (path: string) => void }> = ({ navigate
             </Button>
           </form>
 
-          <div className="mt-8 flex justify-center">
+          {/* CMO Valves Logo (External Image) */}
+          <div className="mt-8 flex justify-center opacity-90">
              <img 
-               src="https://www.cmovalves.com/wp-content/uploads/2020/10/logo-cmo-valves.png" 
+               src="https://cmovalves.com/wp-content/themes/valvulas/img/logo-cmo-valves.png" 
                alt="CMO Valves" 
-               className="h-16 w-auto object-contain opacity-90 hover:opacity-100 transition-opacity"
+               className="h-16 w-auto object-contain"
+               referrerPolicy="no-referrer"
              />
           </div>
         </div>
