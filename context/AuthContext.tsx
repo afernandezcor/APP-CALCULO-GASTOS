@@ -18,6 +18,7 @@ interface AuthContextType {
   resolveProfileUpdate: (userId: string, approve: boolean) => void;
   deleteUser: (userId: string) => void;
   isLoading: boolean;
+  isCloudConnected: boolean; // New export to show status in UI
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,10 +50,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }, (error) => {
             console.error("Cloud sync error:", error);
             // Fallback to local if permission denied or other error
+            setUseCloud(false);
             loadFromLocal();
         });
         return () => unsubscribe();
     } else {
+        setUseCloud(false);
         loadFromLocal();
     }
   }, []);
@@ -184,18 +187,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateData = {
             name: userToUpdate.pendingUpdates.name,
             email: userToUpdate.pendingUpdates.email,
-            pendingUpdates: null // Firestore uses null to delete field or use FieldValue.delete()
+            pendingUpdates: null 
         };
-        // Hack for Firestore deletion of field
-        // In this simple implementation we just set it to undefined/null
     } else {
         updateData = { pendingUpdates: null };
     }
     
-    // Clean up 'null' for local state if needed, but for Firestore usually we need deleteField()
-    // For simplicity in this hybrid:
     if (useCloud) {
-         // We'll write the whole object cleanly
          const updatedUser = { ...userToUpdate };
          if (approve) {
              updatedUser.name = userToUpdate.pendingUpdates.name;
@@ -232,7 +230,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, allUsers, login, signup, logout, updateUserRole, updateUserAvatar, updateUserPassword, requestProfileUpdate, resolveProfileUpdate, deleteUser, isLoading }}>
+    <AuthContext.Provider value={{ 
+        user, 
+        allUsers, 
+        login, 
+        signup, 
+        logout, 
+        updateUserRole, 
+        updateUserAvatar, 
+        updateUserPassword, 
+        requestProfileUpdate, 
+        resolveProfileUpdate, 
+        deleteUser, 
+        isLoading,
+        isCloudConnected: useCloud 
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { UserRole } from '../types';
-import { LogOut, LayoutDashboard, PlusCircle, List, PieChart, FileSpreadsheet, User as UserIcon, Shield, Activity, Globe, Euro, Upload, Camera, X, Menu, AlertCircle } from 'lucide-react';
+import { LogOut, LayoutDashboard, PlusCircle, List, PieChart, FileSpreadsheet, User as UserIcon, Shield, Activity, Globe, Euro, Upload, Camera, X, Menu, AlertCircle, Cloud, CloudOff } from 'lucide-react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 
@@ -14,7 +14,7 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate }) => {
-  const { user, logout, updateUserAvatar, requestProfileUpdate, updateUserPassword } = useAuth();
+  const { user, logout, updateUserAvatar, requestProfileUpdate, updateUserPassword, isCloudConnected } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -80,6 +80,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
 
   const hasChanges = editName !== user.name || editEmail !== user.email || editPassword.length > 0;
 
+  // Minimal Status Dot Component
+  const StatusDot = () => (
+    <div 
+      className={`h-2.5 w-2.5 rounded-full ml-2 transition-all duration-500 ${
+        isCloudConnected 
+          ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' 
+          : 'bg-gray-300'
+      }`} 
+      title={isCloudConnected ? "Sync: Online" : "Sync: Local Only"}
+    />
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       {/* Mobile Header */}
@@ -87,6 +99,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
         <div className="flex items-center gap-2 text-blue-600">
             <Euro className="h-6 w-6" />
             <span className="text-lg font-bold">Track Expense</span>
+            <StatusDot />
         </div>
         <button 
             onClick={() => setIsMobileMenuOpen(true)}
@@ -106,6 +119,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
           <div className="flex items-center gap-2 text-blue-600">
             <Euro className="h-7 w-7" />
             <span className="text-xl font-bold tracking-tight">{t('nav.dashboard')}</span>
+            <StatusDot />
           </div>
           <button 
             className="md:hidden p-1 rounded-md text-gray-500 hover:bg-gray-100" 
@@ -190,6 +204,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPath, navigate 
           </nav>
 
           <div className="border-t pt-4 mt-auto space-y-4">
+            {/* Detailed Cloud Status (Footer) */}
+            <div className={`px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors ${
+                isCloudConnected ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+            }`}>
+                 {isCloudConnected ? <Cloud className="h-4 w-4" /> : <CloudOff className="h-4 w-4" />}
+                 <span>{isCloudConnected ? 'Sync: Online' : 'Sync: Local Only'}</span>
+            </div>
+
             {/* Language Selector */}
             <div className="px-3">
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
