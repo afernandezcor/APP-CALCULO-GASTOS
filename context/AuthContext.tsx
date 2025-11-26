@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { MOCK_USERS } from '../mockData';
+import { db } from '../services/firebase';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -21,36 +23,68 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Initialize users from LocalStorage or use Mock Data
-  const [allUsers, setAllUsers] = useState<User[]>(() => {
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [useCloud, setUseCloud] = useState(false);
+
+  // Initialize Data Source (Cloud vs Local)
+  useEffect(() => {
+    if (db) {
+        setUseCloud(true);
+        // Real-time listener for Cloud Data
+        const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+            const usersData: User[] = [];
+            snapshot.forEach((doc) => {
+                usersData.push(doc.data() as User);
+            });
+            
+            // If DB is empty (first run), maybe seed it? 
+            // For now, we trust the DB. 
+            if (usersData.length === 0) {
+                 // Optional: Seed mock data to cloud if empty
+            }
+            setAllUsers(usersData);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Cloud sync error:", error);
+            // Fallback to local if permission denied or other error
+            loadFromLocal();
+        });
+        return () => unsubscribe();
+    } else {
+        loadFromLocal();
+    }
+  }, []);
+
+  const loadFromLocal = () => {
     const savedUsers = localStorage.getItem('track_expense_users');
     if (savedUsers) {
       try {
-        return JSON.parse(savedUsers);
+        setAllUsers(JSON.parse(savedUsers));
       } catch (e) {
-        console.error("Failed to parse users", e);
-        return MOCK_USERS;
+        setAllUsers(MOCK_USERS);
       }
+    } else {
+      setAllUsers(MOCK_USERS);
     }
-    return MOCK_USERS;
-  });
+    setIsLoading(false);
+  };
 
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Save users to LocalStorage whenever the list changes (e.g. new signup or role change)
+  // Keep local storage updated as a backup/cache
   useEffect(() => {
-    localStorage.setItem('track_expense_users', JSON.stringify(allUsers));
-  }, [allUsers]);
+    if (!useCloud) {
+        localStorage.setItem('track_expense_users', JSON.stringify(allUsers));
+    }
+  }, [allUsers, useCloud]);
 
+  // Session Management
   useEffect(() => {
-    // Simulate session check
     const storedUserId = localStorage.getItem('billboard_user_id');
-    if (storedUserId) {
+    if (storedUserId && allUsers.length > 0) {
       const foundUser = allUsers.find(u => u.id === storedUserId);
       if (foundUser) setUser(foundUser);
     }
-    setIsLoading(false);
   }, [allUsers]);
 
   const login = (email: string, password: string): boolean => {
@@ -63,8 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
-  const signup = (name: string, email: string, password: string) => {
-    // Check if user already exists
+  const signup = async (name: string, email: string, password: string) => {
     const existing = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (existing) {
         alert('User already exists with this email. Please login.');
@@ -76,101 +109,121 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name,
       email,
       password,
-      role: UserRole.SALES, // Default to sales for new signups
+      role: UserRole.SALES,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&background=2563eb`
     };
 
-    const updatedUsers = [...allUsers, newUser];
-    setAllUsers(updatedUsers);
-    setUser(newUser);
+    if (useCloud) {
+        try {
+            // Use setDoc with specific ID to make updates easier
+            await setDoc(doc(db, 'users', newUser.id), newUser);
+        } catch (e) {
+            console.error("Error saving to cloud", e);
+            // Fallback
+            setAllUsers(prev => [...prev, newUser]);
+        }
+    } else {
+        setAllUsers(prev => [...prev, newUser]);
+    }
     
-    // Force immediate save
-    localStorage.setItem('track_expense_users', JSON.stringify(updatedUsers));
+    setUser(newUser);
     localStorage.setItem('billboard_user_id', newUser.id);
   };
 
-  const updateUserRole = (userId: string, newRole: UserRole) => {
-    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-    // If updating self, update current user state
-    if (user && user.id === userId) {
-      setUser(prev => prev ? { ...prev, role: newRole } : null);
+  const updateUserRole = async (userId: string, newRole: UserRole) => {
+    if (useCloud) {
+        try {
+            await updateDoc(doc(db, 'users', userId), { role: newRole });
+        } catch (e) { console.error(e); }
+    } else {
+        setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     }
   };
 
-  const updateUserAvatar = (userId: string, avatarUrl: string) => {
-    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, avatar: avatarUrl } : u));
-    if (user && user.id === userId) {
-        setUser(prev => prev ? { ...prev, avatar: avatarUrl } : null);
+  const updateUserAvatar = async (userId: string, avatarUrl: string) => {
+    if (useCloud) {
+        try {
+            await updateDoc(doc(db, 'users', userId), { avatar: avatarUrl });
+        } catch (e) { console.error(e); }
+    } else {
+        setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, avatar: avatarUrl } : u));
     }
   };
 
-  const updateUserPassword = (userId: string, password: string) => {
-    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, password: password } : u));
-    if (user && user.id === userId) {
-        setUser(prev => prev ? { ...prev, password: password } : null);
+  const updateUserPassword = async (userId: string, password: string) => {
+    if (useCloud) {
+        try {
+            await updateDoc(doc(db, 'users', userId), { password: password });
+        } catch (e) { console.error(e); }
+    } else {
+        setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, password: password } : u));
     }
   };
 
-  const requestProfileUpdate = (userId: string, name: string, email: string) => {
-    setAllUsers(prev => prev.map(u => {
-      if (u.id === userId) {
-        return {
-          ...u,
-          pendingUpdates: {
+  const requestProfileUpdate = async (userId: string, name: string, email: string) => {
+    const updateData = {
+        pendingUpdates: {
             name,
             email,
             date: new Date().toISOString()
-          }
-        };
-      }
-      return u;
-    }));
-    
-    if (user && user.id === userId) {
-      setUser(prev => prev ? {
-          ...prev,
-          pendingUpdates: {
-            name,
-            email,
-            date: new Date().toISOString()
-          }
-      } : null);
-    }
-  };
-
-  const resolveProfileUpdate = (userId: string, approve: boolean) => {
-    setAllUsers(prev => prev.map(u => {
-      if (u.id === userId && u.pendingUpdates) {
-        if (approve) {
-          return {
-            ...u,
-            name: u.pendingUpdates.name,
-            email: u.pendingUpdates.email,
-            pendingUpdates: undefined
-          };
-        } else {
-          return {
-            ...u,
-            pendingUpdates: undefined
-          };
         }
-      }
-      return u;
-    }));
+    };
+    if (useCloud) {
+        await updateDoc(doc(db, 'users', userId), updateData);
+    } else {
+        setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updateData } : u));
+    }
   };
 
-  const deleteUser = (userId: string) => {
-    setAllUsers(prev => {
-        const newUsers = prev.filter(u => u.id !== userId);
-        // Force immediate save
-        localStorage.setItem('track_expense_users', JSON.stringify(newUsers));
-        return newUsers;
-    });
-    
-    // If deleting self (unlikely from admin panel, but possible), logout
-    if (user && user.id === userId) {
-        logout();
+  const resolveProfileUpdate = async (userId: string, approve: boolean) => {
+    const userToUpdate = allUsers.find(u => u.id === userId);
+    if (!userToUpdate?.pendingUpdates) return;
+
+    let updateData = {};
+    if (approve) {
+        updateData = {
+            name: userToUpdate.pendingUpdates.name,
+            email: userToUpdate.pendingUpdates.email,
+            pendingUpdates: null // Firestore uses null to delete field or use FieldValue.delete()
+        };
+        // Hack for Firestore deletion of field
+        // In this simple implementation we just set it to undefined/null
+    } else {
+        updateData = { pendingUpdates: null };
     }
+    
+    // Clean up 'null' for local state if needed, but for Firestore usually we need deleteField()
+    // For simplicity in this hybrid:
+    if (useCloud) {
+         // We'll write the whole object cleanly
+         const updatedUser = { ...userToUpdate };
+         if (approve) {
+             updatedUser.name = userToUpdate.pendingUpdates.name;
+             updatedUser.email = userToUpdate.pendingUpdates.email;
+         }
+         delete updatedUser.pendingUpdates; // Remove property
+         await setDoc(doc(db, 'users', userId), updatedUser);
+    } else {
+        setAllUsers(prev => prev.map(u => {
+            if (u.id === userId) {
+                 if (approve) {
+                     return { ...u, name: u.pendingUpdates!.name, email: u.pendingUpdates!.email, pendingUpdates: undefined };
+                 } else {
+                     return { ...u, pendingUpdates: undefined };
+                 }
+            }
+            return u;
+        }));
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (useCloud) {
+        await deleteDoc(doc(db, 'users', userId));
+    } else {
+        setAllUsers(prev => prev.filter(u => u.id !== userId));
+    }
+    if (user && user.id === userId) logout();
   };
 
   const logout = () => {

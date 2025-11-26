@@ -1,6 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Expense, ExpenseStatus } from '../types';
 import { MOCK_EXPENSES } from '../mockData';
+import { db } from '../services/firebase';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, writeBatch, query, where, getDocs } from 'firebase/firestore';
 
 interface ExpenseContextType {
   expenses: Expense[];
@@ -15,74 +18,116 @@ interface ExpenseContextType {
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
 
 export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Initialize state from LocalStorage if available, otherwise use Mock Data
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const savedExpenses = localStorage.getItem('track_expense_data');
-    if (savedExpenses) {
-      try {
-        const parsed = JSON.parse(savedExpenses);
-        // Ensure we don't crash if parsed data is not an array
-        return Array.isArray(parsed) ? parsed : MOCK_EXPENSES;
-      } catch (e) {
-        console.error("Failed to parse expenses", e);
-        return MOCK_EXPENSES;
-      }
-    }
-    // First time load: use mock data
-    return MOCK_EXPENSES;
-  });
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [useCloud, setUseCloud] = useState(false);
 
-  // Save to LocalStorage whenever expenses change
+  // Initialize Data Source
   useEffect(() => {
-    try {
-        localStorage.setItem('track_expense_data', JSON.stringify(expenses));
-    } catch (error) {
-        console.error("Failed to save expenses to LocalStorage. Storage might be full.", error);
-        
-        // Attempt Fallback: Save expenses BUT remove images from the new data to save space
+    if (db) {
+        setUseCloud(true);
+        // Real-time listener for Cloud Data
+        const unsubscribe = onSnapshot(collection(db, 'expenses'), (snapshot) => {
+            const expensesData: Expense[] = [];
+            snapshot.forEach((doc) => {
+                expensesData.push(doc.data() as Expense);
+            });
+            // Sort by date new to old
+            expensesData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setExpenses(expensesData);
+        });
+        return () => unsubscribe();
+    } else {
+        loadFromLocal();
+    }
+  }, []);
+
+  const loadFromLocal = () => {
+      const savedExpenses = localStorage.getItem('track_expense_data');
+      if (savedExpenses) {
         try {
-            console.log("Attempting fallback save (removing images)...");
-            const lightweightExpenses = expenses.map(e => ({
-                ...e,
-                imageUrl: '' // Strip image to save text data
-            }));
-            localStorage.setItem('track_expense_data', JSON.stringify(lightweightExpenses));
-        } catch (retryError) {
-            console.error("Critical: Failed to save even without images.", retryError);
+          const parsed = JSON.parse(savedExpenses);
+          setExpenses(Array.isArray(parsed) ? parsed : MOCK_EXPENSES);
+        } catch (e) {
+          setExpenses(MOCK_EXPENSES);
+        }
+      } else {
+        setExpenses(MOCK_EXPENSES);
+      }
+  };
+
+  // Sync to local as backup
+  useEffect(() => {
+    if (!useCloud) {
+         try {
+            localStorage.setItem('track_expense_data', JSON.stringify(expenses));
+        } catch (error) {
+            console.error("Local storage full", error);
         }
     }
-  }, [expenses]);
+  }, [expenses, useCloud]);
 
-  const addExpense = (expense: Expense) => {
-    setExpenses(prev => [expense, ...prev]);
+  const addExpense = async (expense: Expense) => {
+    if (useCloud) {
+        try {
+            await setDoc(doc(db, 'expenses', expense.id), expense);
+        } catch (e) {
+            console.error("Cloud save failed", e);
+            alert("Failed to save to cloud. Check console.");
+        }
+    } else {
+        setExpenses(prev => [expense, ...prev]);
+    }
   };
 
-  const updateStatus = (id: string, status: ExpenseStatus, notes?: string) => {
-    setExpenses(prev => prev.map(exp => {
-      if (exp.id === id) {
-        return { ...exp, status, notes: notes ? notes : exp.notes };
-      }
-      return exp;
-    }));
+  const updateStatus = async (id: string, status: ExpenseStatus, notes?: string) => {
+    if (useCloud) {
+        const updateData: any = { status };
+        if (notes) updateData.notes = notes;
+        await updateDoc(doc(db, 'expenses', id), updateData);
+    } else {
+        setExpenses(prev => prev.map(exp => {
+            if (exp.id === id) {
+                return { ...exp, status, notes: notes ? notes : exp.notes };
+            }
+            return exp;
+        }));
+    }
   };
 
-  const deleteExpense = (id: string) => {
-    // Simplified logic: Just filter the array. 
-    // The useEffect above will handle saving to localStorage automatically (just like updateStatus).
-    setExpenses(prev => prev.filter(exp => exp.id !== id));
+  const deleteExpense = async (id: string) => {
+    if (useCloud) {
+        await deleteDoc(doc(db, 'expenses', id));
+    } else {
+        setExpenses(prev => prev.filter(exp => exp.id !== id));
+    }
   };
 
-  const deleteExpensesByUserId = (userId: string) => {
-    setExpenses(prev => prev.filter(exp => exp.userId !== userId));
+  const deleteExpensesByUserId = async (userId: string) => {
+    if (useCloud) {
+        // Batch delete for efficiency
+        const batch = writeBatch(db);
+        const q = query(collection(db, 'expenses'), where("userId", "==", userId));
+        const snapshot = await getDocs(q);
+        snapshot.forEach((doc) => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+    } else {
+        setExpenses(prev => prev.filter(exp => exp.userId !== userId));
+    }
   };
 
-  const editExpense = (id: string, updatedExpense: Partial<Expense>) => {
-    setExpenses(prev => prev.map(exp => {
-      if (exp.id === id) {
-        return { ...exp, ...updatedExpense };
-      }
-      return exp;
-    }));
+  const editExpense = async (id: string, updatedExpense: Partial<Expense>) => {
+    if (useCloud) {
+        await updateDoc(doc(db, 'expenses', id), updatedExpense);
+    } else {
+        setExpenses(prev => prev.map(exp => {
+        if (exp.id === id) {
+            return { ...exp, ...updatedExpense };
+        }
+        return exp;
+        }));
+    }
   };
 
   const getExpensesByUser = (userId: string) => {

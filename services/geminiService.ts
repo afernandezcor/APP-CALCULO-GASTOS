@@ -2,12 +2,19 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ReceiptAnalysisResult } from '../types';
 
 const getClient = () => {
-    // The API key must be obtained exclusively from the environment variable process.env.API_KEY
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        console.error("API Key not found. Ensure process.env.API_KEY is set.");
+    // Safely retrieve API Key strictly from process.env.API_KEY as per guidelines
+    // We add a safety check for 'process' to avoid ReferenceError in browser-only environments
+    let key = '';
+    try {
+        // @ts-ignore
+        if (typeof process !== 'undefined' && process.env) {
+            key = process.env.API_KEY;
+        }
+    } catch (e) {
+        console.warn("process.env.API_KEY access failed");
     }
-    return new GoogleGenAI({ apiKey: apiKey || 'dummy-key' });
+    
+    return new GoogleGenAI({ apiKey: key });
 };
 
 export const analyzeReceiptImage = async (base64Image: string): Promise<ReceiptAnalysisResult> => {
