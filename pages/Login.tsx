@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Button } from '../components/Button';
-import { Euro } from 'lucide-react';
+import { Euro, CloudOff, Wifi } from 'lucide-react';
 
 interface BgSymbol {
   x: number;
@@ -13,8 +13,41 @@ interface BgSymbol {
   rot: number;
 }
 
+// CmoLogo SVG Component - Accurate Replication of Reference Image 2
+const CmoLogo = () => (
+  <svg width="200" height="80" viewBox="0 0 400 160" xmlns="http://www.w3.org/2000/svg" className="w-auto h-12 md:h-16">
+    <defs>
+      <linearGradient id="iconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#0088cc" />
+        <stop offset="100%" stopColor="#005580" />
+      </linearGradient>
+    </defs>
+    
+    {/* Icon Group - Centered above text */}
+    <g transform="translate(140, 10) scale(0.55)">
+        {/* Main Blue Circle with Gradient */}
+        <circle cx="100" cy="100" r="95" fill="url(#iconGradient)" />
+        
+        {/* White Keyhole/Valve Cutout */}
+        <path d="M100 195 L100 165 A 65 65 0 1 1 100 35 A 65 65 0 1 1 100 165 L100 195" fill="white" stroke="white" strokeWidth="2" />
+    </g>
+
+    {/* Text Group - Below Icon */}
+    <g transform="translate(25, 125)">
+        {/* CMO - Extra Bold Black */}
+        <text x="55" y="0" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="58" fill="#111">CMO</text>
+        
+        {/* VALVES - Thin/Light Blue */}
+        <text x="195" y="0" fontFamily="Arial, sans-serif" fontWeight="300" fontSize="58" fill="#0077be">VALVES</text>
+    </g>
+
+    {/* Tagline */}
+    <text x="200" y="150" fontFamily="Arial, sans-serif" fontSize="16" fill="#666" textAnchor="middle">manufacturing the valve you need</text>
+  </svg>
+);
+
 export const Login: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
-  const { login, allUsers } = useAuth();
+  const { login, allUsers, isCloudConnected } = useAuth();
   const { t, setLanguage, language } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,20 +76,14 @@ export const Login: React.FC<{ navigate: (path: string) => void }> = ({ navigate
     setLoginStatus('idle');
 
     // Pre-check credentials to trigger animations
-    // Note: We manually check against allUsers here just for the visual effect logic
-    // The actual login call will be made after the animation if successful
     const user = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
 
     if (user) {
-        // Success Animation: Light up symbols
         setLoginStatus('success');
-        
-        // Delay actual login to show animation - FASTER NOW (800ms)
         setTimeout(() => {
             login(email, password); 
         }, 800);
     } else {
-        // Error Animation: Blur background
         setLoginStatus('error');
         setError('Invalid email or password.');
     }
@@ -112,7 +139,6 @@ export const Login: React.FC<{ navigate: (path: string) => void }> = ({ navigate
       }`}>
         <div className="p-8">
           <div className="flex justify-between items-start mb-6">
-             {/* Original Track Expense Logo */}
              <div className="bg-blue-600 p-3 rounded-xl shadow-lg">
                 <Euro className="h-8 w-8 text-white" />
              </div>
@@ -125,6 +151,16 @@ export const Login: React.FC<{ navigate: (path: string) => void }> = ({ navigate
           
           <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">{t('login.welcome')}</h2>
           <p className="text-center text-gray-500 mb-8">{t('login.subtitle')}</p>
+          
+          {!isCloudConnected && (
+             <div className="mb-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3 text-sm text-yellow-800">
+                <CloudOff className="h-5 w-5 flex-shrink-0" />
+                <div>
+                   <strong>Offline Mode (Local)</strong>
+                   <p className="text-xs opacity-80">Data is saved only on this device. Configure Firebase in Vercel to sync.</p>
+                </div>
+             </div>
+          )}
           
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
@@ -168,7 +204,7 @@ export const Login: React.FC<{ navigate: (path: string) => void }> = ({ navigate
             </Button>
           </form>
 
-          {/* CMO Valves Logo (External Image) */}
+          {/* CMO Valves Logo - External Image with Referrer Fix */}
           <div className="mt-8 flex justify-center opacity-90">
              <img 
                src="https://cmovalves.com/wp-content/themes/valvulas/img/logo-cmo-valves.png" 

@@ -1,19 +1,30 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { ReceiptAnalysisResult } from '../types';
 
 const getClient = () => {
-    // 1. Usa el nombre de variable de entorno que estás usando en el código (API_KEY)
-    const apiKey = process.env.API_KEY;
-
-    // 2. ¡Comprobación estricta! Si no existe, lanza un error claro.
-    if (!apiKey) {
-        // Esto causará que el build o la ejecución falle, pero con un mensaje claro.
-        // Es mejor que falle aquí que en producción por un error desconocido.
-        throw new Error("La clave de API (process.env.API_KEY) no está configurada.");
+    // Helper to safely get API Key from multiple potential sources (Vite env, Vercel, Node)
+    let key = '';
+    
+    try {
+        // 1. Try Vite/Vercel Environment Variable (Standard for frontend)
+        // @ts-ignore
+        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
+            // @ts-ignore
+            key = import.meta.env.VITE_GEMINI_API_KEY;
+        }
+        
+        // 2. Fallback to process.env (Legacy/Node/System) - Guidelines preference
+        // @ts-ignore
+        else if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+            // @ts-ignore
+            key = process.env.API_KEY;
+        }
+    } catch (e) {
+        console.warn("API Key retrieval failed");
     }
-
-    // 3. TypeScript sabe que 'apiKey' ahora es definitivamente un 'string'.
-    return new GoogleGenAI({ apiKey });
+    
+    return new GoogleGenAI({ apiKey: key });
 };
 
 export const analyzeReceiptImage = async (base64Image: string): Promise<ReceiptAnalysisResult> => {
