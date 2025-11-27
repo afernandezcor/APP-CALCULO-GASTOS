@@ -1,53 +1,45 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, Firestore } from 'firebase/firestore';
 
-// Helper to safely get environment variables in various environments (Vite, Vercel, Playground)
-const getEnv = (key: string) => {
-  try {
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      // @ts-ignore
-      return import.meta.env[key];
-    }
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env) {
-      // @ts-ignore
-      return process.env[key];
-    }
-  } catch (e) {
-    return undefined;
-  }
-  return undefined;
+// 1. HELPER SIMPLIFICADO: Solo lee del entorno de Vite
+// En Vercel, las variables del frontend SOLO se exponen a través de import.meta.env
+const getEnv = (key: string): string | undefined => {
+    // Usamos 'as any' para acceder a import.meta.env de forma segura en TypeScript
+    // Vercel y Vite se encargan de exponer las variables con prefijo VITE_
+    const env = (import.meta as any).env;
+    return env ? env[key] : undefined;
 };
 
-// Configuration uses VITE_ prefix variables for Vercel/Vite
+// 2. CONFIGURACIÓN: Obtiene los valores usando el helper
 const firebaseConfig = {
-  apiKey: getEnv('VITE_FIREBASE_API_KEY'),
-  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
-  projectId: getEnv('VITE_FIREBASE_PROJECT_ID'),
-  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
-  appId: getEnv('VITE_FIREBASE_APP_ID')
+    apiKey: getEnv('VITE_FIREBASE_API_KEY'),
+    authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+    projectId: getEnv('VITE_FIREBASE_PROJECT_ID'),
+    storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+    appId: getEnv('VITE_FIREBASE_APP_ID')
 };
 
-// Singleton instance
-let db: any = null;
+// 3. INSTANCIA DE FIRESTORE: Tipo definido como Firestore
+let db: Firestore | null = null;
 
 try {
-  // Check if API key is present (and not the placeholder)
-  if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
-      const app = initializeApp(firebaseConfig);
-      db = getFirestore(app);
-      console.log("Firebase initialized successfully");
-  } else {
-      console.warn("Firebase config missing or invalid. Using Local Storage fallback.");
-      // @ts-ignore
-      if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD) {
-          console.error("CRITICAL: Firebase Env Vars are missing in Vercel!");
-      }
-  }
+    // Aseguramos que la clave de API exista
+    if (firebaseConfig.apiKey) {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        console.log("Firebase initialized successfully");
+    } else {
+        console.warn("Firebase config missing or invalid. Using Local Storage fallback.");
+        
+        // El error CRITICAL solo debe mostrarse si estamos en Producción (en Vercel)
+        // y la configuración falló. Usamos la forma nativa de Vite para chequear PROD.
+        if ((import.meta as any).env.PROD) {
+             console.error("CRITICAL: Firebase Env Vars are missing in Vercel!");
+        }
+    }
 } catch (error) {
-  console.error("Firebase initialization failed:", error);
+    console.error("Firebase initialization failed:", error);
 }
 
 export { db };
