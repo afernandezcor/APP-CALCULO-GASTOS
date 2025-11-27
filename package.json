@@ -19,7 +19,7 @@
     "uuid": "^9.0.1",
     "clsx": "^2.1.0",
     "tailwind-merge": "^2.2.1",
-    "firebase-admin": "^12.0.0" 
+    "firebase-admin": "^9.12.0" 
   },
   "devDependencies": {
     "@types/react": "^18.2.56",
