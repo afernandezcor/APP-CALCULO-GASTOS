@@ -33,7 +33,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     if (req.method === 'GET') {
         try {
             const snapshot = await db.collection('gastos').orderBy('fecha', 'desc').get();
-            const listaGastos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+           const listaGastos = snapshot.docs.map((doc: admin.firestore.DocumentData) => ({ id: doc.id, ...doc.data() }));
             return res.status(200).json(listaGastos);
         } catch (error) {
             console.error("Error en GET /api/gastos:", error);
