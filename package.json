@@ -1,13 +1,5 @@
 {
-  "name": "track-expense",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
+  // ... (otras secciones)
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -18,7 +10,9 @@
     "xlsx": "^0.18.5",
     "uuid": "^9.0.1",
     "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.1"
+    "tailwind-merge": "^2.2.1",
+    // Asegúrate de que firebase-admin esté aquí si lo instalaste
+    "firebase-admin": "^12.0.0" // <-- ¡CRÍTICO si lo instalaste!
   },
   "devDependencies": {
     "@types/react": "^18.2.56",
@@ -29,6 +23,10 @@
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
-    "vite": "^5.1.4"
+    "vite": "^5.1.4",
+    
+    // <-- ¡AÑADE ESTAS DOS LÍNEAS para solucionar el error TS2307! -->
+    "@types/firebase-admin": "^12.0.0", 
+    "@vercel/node": "^3.0.7" 
   }
 }
